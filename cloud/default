@@ -1,0 +1,110 @@
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ~^(?<subdomain>.+)\.linkoo\.dev$;
+
+    ssl_certificate /etc/letsencrypt/live/linkoo.dev-0001/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/linkoo.dev-0001/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Служебные поддомены не трогаем
+#    if ($subdomain ~* "^(www|netdata|api|mail|smtp|ftp)$") {
+#        return 404;
+#    }
+
+    location / {
+        proxy_pass http://100.105.255.110:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Subdomain $subdomain;
+        proxy_set_header CF-IPCountry $geoip2_country_code;
+    }
+}
+
+# HTTP редирект для поддоменов
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ~^(?<subdomain>.+)\.linkoo\.dev$;
+    return 301 https://$host$request_uri;
+}
+
+# HTTP -> HTTPS редирект
+server {
+    listen 80;
+    listen [::]:80;
+    server_name linkoo.dev www.linkoo.dev;
+    
+    return 301 https://$server_name$request_uri;
+}
+
+# HTTPS
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    
+    server_name linkoo.dev www.linkoo.dev;
+
+    # SSL сертификаты
+    ssl_certificate /etc/letsencrypt/live/linkoo.dev/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/linkoo.dev/privkey.pem;
+    
+    # SSL настройки
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+      location /api/auth/max {
+          proxy_pass http://100.105.255.110:80;
+
+          # КРИТИЧНО: WebSocket поддержка
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+
+          # Заголовки
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+
+          # Длинные таймауты для WebSocket
+          proxy_read_timeout 600s;
+          proxy_send_timeout 600s;
+      }
+
+    location / {
+        proxy_pass http://100.105.255.110:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header CF-IPCountry $geoip2_country_code;
+    }
+}
+
+#server {
+#    listen 443 ssl http2;
+#    server_name netdata.linkoo.dev;
+#    
+#    ssl_certificate /etc/letsencrypt/live/linkoo.dev/fullchain.pem;
+#    ssl_certificate_key /etc/letsencrypt/live/linkoo.dev/privkey.pem;
+#
+#    ssl_protocols TLSv1.2 TLSv1.3;
+#    ssl_ciphers HIGH:!aNULL:!MD5;
+#    ssl_prefer_server_ciphers on;
+#    
+#    location / {
+#        proxy_pass http://100.105.255.110:19999;
+#        proxy_set_header Host $host;
+#        proxy_set_header X-Real-IP $remote_addr;
+#        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#        proxy_set_header X-Forwarded-Proto $scheme;
+#    }
+#}
+

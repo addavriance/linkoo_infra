@@ -1,0 +1,122 @@
+version: '3.8'
+services:
+  # MongoDB 4.4 (работает без AVX)
+  mongodb:
+    image: mongo:4.4
+    container_name: linkoo-mongodb-prod
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME}
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - linkoo-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./linkoo_backend
+      dockerfile: Dockerfile
+    container_name: linkoo-backend-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: ${BACKEND_PORT:-5000}
+      API_URL: ${API_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DB_NAME}?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      VK_CLIENT_ID: ${VK_CLIENT_ID}
+      VK_CLIENT_SECRET: ${VK_CLIENT_SECRET}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      YUKASSA_SHOP_ID: ${YUKASSA_SHOP_ID}
+      YUKASSA_SECRET_KEY: ${YUKASSA_SECRET_KEY}
+      YUKASSA_RETURN_URL: ${YUKASSA_RETURN_URL}
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - mongodb
+    networks:
+      - linkoo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # Frontend
+  frontend:
+    build:
+      context: ./linkoo
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: linkoo-frontend-prod
+    restart: always
+    depends_on:
+      - backend
+    networks:
+      - linkoo-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: linkoo-nginx-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - linkoo-network
+
+#  netdata:
+#    image: netdata/netdata
+#    container_name: linkoo-netdata
+#    restart: always
+#    hostname: netdata
+#    networks:
+#      - linkoo-network
+#    ports:
+#      - "100.105.255.110:19999:19999" 
+#    volumes:
+#      - /proc:/host/proc:ro
+#      - /sys:/host/sys:ro
+#      - /var/run/docker.sock:/var/run/docker.sock:ro
+#    environment:
+#      - DOCKER_HOST=unix:///var/run/docker.sock
+#    cap_add:
+#      - SYS_PTRACE
+#    security_opt:
+#      - apparmor:unconfined
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+
+networks:
+  linkoo-network:
+    driver: bridge
+
