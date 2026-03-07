@@ -45,6 +45,9 @@ services:
       YUKASSA_SHOP_ID: ${YUKASSA_SHOP_ID}
       YUKASSA_SECRET_KEY: ${YUKASSA_SECRET_KEY}
       YUKASSA_RETURN_URL: ${YUKASSA_RETURN_URL}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
     volumes:
       - ./uploads:/app/uploads
     depends_on:
