@@ -66,6 +66,7 @@ jobs:
             set -e
             cd /home/${{ secrets.SERVER_USER }}
             docker compose up -d --no-build
+            docker compose restart nginx
 
       - name: Calculate duration
         id: duration
