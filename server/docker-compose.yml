@@ -39,6 +39,8 @@ services:
     build:
       context: ./linkoo_backend
       dockerfile: Dockerfile
+      args:
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
     container_name: linkoo-backend-prod
     restart: always
     environment:
@@ -84,6 +86,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL}
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
     container_name: linkoo-frontend-prod
     restart: always
     depends_on:
